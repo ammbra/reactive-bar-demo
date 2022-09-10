@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Drinks</title>
+
+    <link rel="stylesheet" type="text/css"
+          href="https://cdnjs.cloudflare.com/ajax/libs/patternfly/3.24.0/css/patternfly.min.css">
+    <link rel="stylesheet" type="text/css"
+          href="https://cdnjs.cloudflare.com/ajax/libs/patternfly/3.24.0/css/patternfly-additions.min.css">
+</head>
+<body>
+
+<div class="container">
+
+    <h1>Order</h1>
+
+    <form id="orderForm" class="form-horizontal">
+        <div class="form-group">
+            <label class="col-md-2 control-label" for="customer">Name</label>
+            <div class="col-md-6">
+                <input type="text" id="customer" class="form-control">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-md-2 control-label" for="orderMethod">Order method</label>
+            <div class="col-md-10">
+                <select id="orderMethod">
+                    <option value="http">HTTP</option>
+                    <option value="notify">Kafka</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-md-2 control-label" for="product">Product</label>
+            <div class="col-md-10">
+                <select id="product">
+                    <option value="beer">Beer</option>
+                    <option value="whisky">Whisky</option>
+                    <option value="gin-tonic">Gin Tonic</option>
+                    <option value="pina-colada">Pina Colada</option>
+                    <option value="cosmopolitan">Cosmopolitan</option>
+                    <option value="cuba-libre">Cuba Libre</option>
+                    <option value="mojito">Mojito</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-md-10 col-md-offset-2">
+                <button id="order-button" type="submit" class="btn btn-primary">Place order</button>
+            </div>
+        </div>
+    </form>
+
+</div>
+
+<div class="container" id="order-result-message"></div>
+
+<div class="container">
+
+    <h1>Queue</h1>
+
+    <table class="table table-striped">
+        <thead class="thead-dark">
+        <tr>
+            <th>Customer</th>
+            <th>Product</th>
+            <th>Method</th>
+            <th>Prepared By</th>
+            <th>State</th>
+        </tr>
+        </thead>
+        <tbody>
+
+        </tbody>
+    </table>
+
+</div>
+
+
+
+
+
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/patternfly/3.24.0/js/patternfly.min.js"></script>
+
+<script>
+
+    $("#orderForm").submit(function(event){
+        const method = $("#orderMethod option:selected").val();
+        const order = {
+            customer: $("#customer").val(),
+            product: $("#product option:selected").val()
+        };
+        console.log("Customer name = " + order.customer);
+
+        if(method==="http") {
+            const state = {
+                customer: order.customer,
+                product: order.product,
+                method: method,
+                status: "IN_PROGRESS"
+            };
+            $("tbody").prepend(line(state, method));
+            $("#order-button").addClass("disabled").attr("disabled", true);
+        }
+
+        event.preventDefault();
+        const post_url = "/" + method; //get form action url
+        const request_method = "POST"; //get form GET/POST method
+
+        $.ajax({
+            url : post_url,
+            type: request_method,
+            data : JSON.stringify(order),
+            contentType: 'application/json',
+            cache: false
+        }).done(function(response){
+            if(method==="http") {
+                const state = {
+                    orderId: response.orderId,
+                    customer: order.customer,
+                    product: order.product,
+                    method: method,
+                    servedBy: response.servedBy,
+                    status: response.status
+                };
+                $('tbody tr:first').replaceWith(line(state, method));
+                $("#order-button").removeClass("disabled").removeAttr("disabled");
+            }
+        }).fail(function(err) {
+            $("#order-result-message").append("<div class='alert alert-danger alert-dismissable'><button type='button' class='close' data-dismiss='alert' aria-label='Close'><span class='pficon pficon-close'></span></button><span class='pficon pficon-error-circle-o'></span><strong>Error</strong>" + err.responseText + "</div>");
+            $('tbody tr:last').remove();
+            $("#order-button").removeClass("disabled").removeAttr("disabled");
+            console.error(err);
+        });
+    });
+
+    $(function () {
+        const source = new EventSource("/queue");
+        source.onmessage = function(e) {
+            if (e.data === "{}") {
+                return;
+            }
+            console.log(e);
+            const beverage = JSON.parse(e.data);
+            if(beverage.status==="IN_PROGRESS")
+                $("tbody").prepend(line(beverage, "kafka"));
+            if(beverage.status==="READY")
+                $("#"+beverage.orderId).replaceWith(line(beverage, "kafka"));
+
+        };
+    });
+
+    function line(bev, method) {
+        const id = bev.orderId;
+        const product = bev.product;
+        const customer = bev.customer;
+        let bartender = "";
+        if (bev.servedBy) {
+            bartender = bev.servedBy;
+        }
+        return "<tr id='" + id + "'>" +
+            "<td>" + customer + "</td>" +
+            "<td>" + product + "</td>" +
+            "<td>" + method +"</td>" +
+            "<td>" + bartender + "</td>" +
+            "<td>" + bev.status + "</td></tr>";
+    }
+
+
+</script>
+</html>
