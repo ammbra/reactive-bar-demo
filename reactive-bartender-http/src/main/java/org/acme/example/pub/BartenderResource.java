@@ -8,7 +8,6 @@ import org.jboss.logging.Logger;
 
 import javax.inject.Inject;
 import javax.ws.rs.POST;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;

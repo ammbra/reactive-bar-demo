@@ -33,9 +33,7 @@ public class BarResource {
         return beverage.ready();
     }
 
-    // Orders emitter (orders)
     @Channel("orders") Emitter<Order> orders;
-    // Queue emitter (beverages)
     @Channel("queue") Emitter<Drink> queue;
 
     @POST
